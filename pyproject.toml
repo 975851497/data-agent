@@ -1,0 +1,21 @@
+[project]
+name = "data-agent"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "asyncmy",
+    "cryptography",
+    "elasticsearch[async]>=8,<9",
+    "fastapi[standard]",
+    "huggingface-hub",
+    "jieba",
+    "langchain",
+    "langchain-deepseek",
+    "langchain-huggingface",
+    "langgraph",
+    "loguru",
+    "omegaconf",
+    "pyyaml",
+    "qdrant-client",
+    "sqlalchemy",
+]
