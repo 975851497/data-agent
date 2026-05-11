@@ -3,6 +3,7 @@ name = "data-agent"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
+    "asyncio>=4.0.0",
     "asyncmy",
     "cryptography",
     "elasticsearch[async]>=8,<9",
@@ -15,6 +16,7 @@ dependencies = [
     "langgraph",
     "loguru",
     "omegaconf",
+    "python-dotenv>=1.2.2",
     "pyyaml",
     "qdrant-client",
     "sqlalchemy",
