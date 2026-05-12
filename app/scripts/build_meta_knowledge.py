@@ -1,40 +1,61 @@
-import sys
+import asyncio
+from pathlib import Path
+
 from Lib import argparse
-print(sys.path)
-from app.core.log import logger
 
-def build():
-    """
-    构建元知识库函数
-    用于执行构建元知识相关的业务逻辑，例如加载配置、初始化数据等
-    """
-    # 打印INFO级别的日志，记录当前正在执行的操作
-    logger.info("Building meta knowledge...")
+from app.clients.embedding_client_manager import embedding_client_manager
+from app.clients.es_client_manager import es_client_manager
+from app.clients.mysql_client_manager import meta_mysql_client_manager, dw_mysql_client_manager
+from app.clients.qdrant_client_manager import qdrant_client_manager
+from app.repositories.es.value_es_repository import ValueEsRepository
+from app.repositories.msyql.dw_mysql_repository import DwMysqlRepository
+from app.repositories.msyql.meta_mysql_repository import MetaMysqlRepository
+from app.repositories.qdrant.column_qdrant_repository import ColumnQdrantRepository
+from app.services.meta_knowledge_service import MetaKnowledgeService
 
 
-# 判断当前脚本是否作为主程序运行
+async def build(file_path:Path):
+    # 初始化客户端对象
+    meta_mysql_client_manager.init()
+    dw_mysql_client_manager.init()
+    qdrant_client_manager.init()
+    embedding_client_manager.init()
+    es_client_manager.init()
+
+    # 获取session
+    async with meta_mysql_client_manager.session_factory() as meta_session ,dw_mysql_client_manager.session_factory() as dw_session:
+
+
+        # 创建repository对象
+        meta_mysql_repository = MetaMysqlRepository(meta_session)
+        dw_mysql_repository = DwMysqlRepository(dw_session)
+        column_qdrant_repository = ColumnQdrantRepository(qdrant_client_manager.client)
+        value_es_repository = ValueEsRepository(es_client_manager.client)
+        # 创建service对象
+        meta_knowledge_service= MetaKnowledgeService(
+            meta_mysql_repository=meta_mysql_repository,
+            dw_mysql_repository=dw_mysql_repository,
+            column_qdrant_repository=column_qdrant_repository,
+            embedding_client=embedding_client_manager.client,
+            value_es_repository=value_es_repository
+        )
+        # 调用业务函数
+        await meta_knowledge_service.build(file_path)
+    # 释放资源
+    await meta_mysql_client_manager.close()
+    await dw_mysql_client_manager.close()
+    await es_client_manager.close()
+
+
 if __name__ == '__main__':
-    # 创建一个命令行参数解析器对象
 
-    parser = argparse.ArgumentParser(
-        prog='ProgramName',  # 程序名称，在帮助信息中显示
-        description='What the program does',  # 程序的简短描述
-        epilog='Text at the bottom of help'  # 帮助信息底部的附加文本
-    )
 
-    # 添加一个位置参数（必须传入的参数），名为 filename
-    parser.add_argument('filename')
-    # 添加一个可选参数，支持短选项 -c 和长选项 --count
-    parser.add_argument('-c', '--count')
-    # 添加一个可选参数，支持短选项 -v 和长选项 --verbose
-    # action='store_true' 表示该参数是一个开关，出现时设为 True，不出现则为 False
-    parser.add_argument(
-        '-v', '--verbose',
-        action='store_true'  # on/off flag
-    )
-    # 解析命令行传入的所有参数，并将结果存入 args 对象
+    # 构建解析对象
+    parser = argparse.ArgumentParser()
+    # 设置解析配置
+    parser.add_argument('-c', '--conf')  # 接受一个值的选项
+    # 解析终端指令
     args = parser.parse_args()
-    # 打印解析后的所有参数，用于调试或确认
-    print(args)
-    # 调用主业务函数 build()
-    build()
+    file_path=Path(args.conf)
+
+    asyncio.run(build(file_path))
