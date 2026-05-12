@@ -1,5 +1,5 @@
 import sys
-
+from Lib import argparse
 print(sys.path)
 from app.core.log import logger
 
@@ -15,4 +15,6 @@ def build():
 # 判断当前脚本是否作为主程序运行
 if __name__ == '__main__':
     # 调用build函数，执行元知识构建逻辑
+    logger.info(sys.argv)
+    logger.info(sys.argv[2])
     build()
