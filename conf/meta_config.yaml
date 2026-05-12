@@ -1,0 +1,16 @@
+tables: # 表格信息
+    - name: <table_name> # 真实表名
+      role: dim | fact # 表角色
+      description: <table_description> # 表的业务含义说明
+      columns:
+          - name: <column_name> # 真实字段名
+            role: primary_key | foreign_key | dimension | measure # 字段角色 
+            description: <column_description> # 字段的业务含义
+            alias: [<alias1>, <alias2>] # 字段同义词
+            sync: true | false # 该字段取值是否需要同步到ES建立全文索引
+
+metrics: # 指标信息
+    - name: <metric_name> # 指标名称，如 GMV、AOV
+      description: <metric_description> # 指标的业务含义与计算口径说明
+      relevant_columns: [<table_name.column_name>] # 指标相关字段
+      alias: [<alias1>, <alias2>] # 指标同义词
