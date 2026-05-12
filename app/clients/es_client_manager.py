@@ -1,135 +1,125 @@
-import os
+import asyncio
 from typing import Optional
 
-import asyncio
-from elasticsearch import AsyncElasticsearch, Elasticsearch
-from dotenv import load_dotenv
+from elasticsearch import AsyncElasticsearch
 
-load_dotenv()
+from app.conf.app_config import app_config, ESConfig
 
 
+class EsClientManager:
+    def __init__(self,config:ESConfig):
+        self.client:Optional[AsyncElasticsearch] = None
+        self.config=config
 
-class ESClientManager:
-    def __init__(self):
-        self.client : Optional[AsyncElasticsearch] = None
-
+    def _get_url(self):
+        return f"http://{self.config.host}:{self.config.port}"
     def init(self):
-        url = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
         self.client = AsyncElasticsearch(
-        hosts=[url]
-    )
-
+            hosts=[self._get_url()],
+        )
 
     async def close(self):
         await self.client.close()
 
 
+es_client_manager = EsClientManager(app_config.es)
 
-if __name__ == "__main__":
-    # 实例化ES客户端管理器，传入全局配置中的ES连接配置
-    es_client_manager = ESClientManager()
+
+if __name__ == '__main__':
+
+    # 初始化es客户端
     es_client_manager.init()
+    # 获取client
+    client = es_client_manager.client
 
     async def test():
-        client = es_client_manager.client
-        resp = await client.indices.create(
-            index="my-books",
-            mappings={
-                "dynamic": False,
-                "properties": {
-                    "name": {
-                        "type": "text"
-                    },
-                    "author": {
-                        "type": "text"
-                    },
-                    "release_date": {
-                        "type": "date",
-                        "format": "yyyy-MM-dd"
-                    },
-                    "page_count": {
-                        "type": "integer"
-                    }
-                }
-            },
-        )
-        print(resp)
+        """
+        1.判断是否存在索引
+        2.不存在创建索引
+        3.添加文档
+        4.检索文档
 
+        :return:
+        """
+        # 判断是否存在
+        if not await client.indices.exists(index="my_books"):
+            # 创建
+            resp = await client.indices.create(
+                index="my_books",
+                mappings={
+                    "dynamic": False,
+                    "properties": {
+                        "name": {
+                            "type": "text"
+                        },
+                        "author": {
+                            "type": "text"
+                        },
+                        "release_date": {
+                            "type": "date",
+                            "format": "yyyy-MM-dd"
+                        },
+                        "page_count": {
+                            "type": "integer"
+                        }
+                    }
+                },
+            )
 
-        resp = await client.bulk(
-            index="my-books",
-            operations=[
-                {
-                    "index": {
-                        "_index": "my-books"
-                    }
-                },
-                {
-                    "name": "Revelation Space",
-                    "author": "Alastair Reynolds",
-                    "release_date": "2000-03-15",
-                    "page_count": 585
-                },
-                {
-                    "index": {
-                        "_index": "my-books"
-                    }
-                },
-                {
-                    "name": "1984",
-                    "author": "George Orwell",
-                    "release_date": "1985-06-01",
-                    "page_count": 328
-                },
-                {
-                    "index": {
-                        "_index": "my-books"
-                    }
-                },
-                {
-                    "name": "Fahrenheit 451",
-                    "author": "Ray Bradbury",
-                    "release_date": "1953-10-15",
-                    "page_count": 227
-                },
-                {
-                    "index": {
-                        "_index": "my-books"
-                    }
-                },
-                {
-                    "name": "Brave New World",
-                    "author": "Aldous Huxley",
-                    "release_date": "1932-06-01",
-                    "page_count": 268
-                },
-                {
-                    "index": {
-                        "_index": "my-books"
-                    }
-                },
-                {
-                    "name": "The Handmaids Tale",
-                    "author": "Margaret Atwood",
-                    "release_date": "1985-06-01",
-                    "page_count": 311
-                }
-            ]
-        )
-        print(resp)
+        # 添加文档
+        # resp =await  client.bulk(
+        #     operations=[
+        #         {
+        #             "index": {
+        #                 "_index": "my_books"
+        #             }
+        #         },
+        #         {
+        #             "name": "Revelation Space",
+        #             "author": "Alastair Reynolds",
+        #             "release_date": "2000-03-15",
+        #             "page_count": 585
+        #         },
+        #         {
+        #             "index": {
+        #                 "_index": "my_books"
+        #             }
+        #         },
+        #         {
+        #             "name": "1984",
+        #             "author": "George Orwell",
+        #             "release_date": "1985-06-01",
+        #             "page_count": 328
+        #         }
+        #     ],
+        # )
+        # print(resp)
 
-
-
-        resp = await client.search(
-            index="my-books",
+        # 检索
+        resp =await  client.search(
+            index="my_books",
             query={
                 "match": {
-                    "name": "brave"
+                    "author": "Orwell"
                 }
             },
         )
-        print(resp)
 
-        await es_client_manager.close()
+        for hit in  resp['hits']['hits']:
+
+            print(hit['_source'])
+
+        await client.close()
+
+
 
     asyncio.run(test())
+
+
+
+
+
+
+
+
+
