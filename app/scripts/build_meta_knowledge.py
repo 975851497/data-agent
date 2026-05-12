@@ -1,5 +1,7 @@
-from app.core.log import logger
+import sys
 
+print(sys.path)
+from app.core.log import logger
 
 def build():
     """
@@ -14,4 +16,3 @@ def build():
 if __name__ == '__main__':
     # 调用build函数，执行元知识构建逻辑
     build()
-
