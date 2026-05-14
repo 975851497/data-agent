@@ -7,15 +7,16 @@ from app.conf import meta_config
 from app.conf.meta_config import MetaConfig
 from app.core.log import logger
 from app.models.mysql.table_info_mysql import TableInfoMySQL
+from app.repositories.msyql.meta_mysql_repository import MetaMysqlRepository
 
 
 # 业务中需要什么，入参传什么 ，比如操作数据库--需要把repository传进来
 # 又因为业务需要"配置yaml"，所以要在build_meta_knowledge 中创建MetaKnowledgeService
 # 我感觉相当于 脚本调用这个service
 class MetaKnowledgeService:
-   def __init__(self):
-       pass
-
+   def __init__(self,meta_mysql_repository:MetaMysqlRepository):
+        # 下边要入库，所以这里要传进来，meta_mysql_repository
+        self.meta_mysql_repository = meta_mysql_repository
    async def build(self, file_path:Path):
         # 要干嘛？ 第一步：加载配置文件
         #  加载配置文件内容
@@ -56,7 +57,10 @@ class MetaKnowledgeService:
                 table_infos.append(table_info_mysql)
 
         # 保存到meta数据库。这时候需要操作它的客户端。在哪？持久层
-
+        """
+        入库，调用持久层repository 某个方法，把存的东西给它
+        """
+        await self.meta_mysql_repository.savq_table_infos(table_infos)
         # 为字段信息构建向量索引
 
         # 为字段值信息构建全文索引
