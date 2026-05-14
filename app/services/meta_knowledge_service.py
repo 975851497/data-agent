@@ -1,10 +1,12 @@
 from pathlib import Path
 
 from omegaconf import OmegaConf
+from sqlalchemy.sql import roles
 
 from app.conf import meta_config
 from app.conf.meta_config import MetaConfig
 from app.core.log import logger
+from app.models.mysql.table_info_mysql import TableInfoMySQL
 
 
 # 业务中需要什么，入参传什么 ，比如操作数据库--需要把repository传进来
@@ -37,14 +39,24 @@ class MetaKnowledgeService:
         """
         # 判断是否存在表信息的构建
         if meta_config.tables:
-
+            # 定义表信息，封装列表
+            table_infos:list[TableInfoMySQL] = []
             # 不为空，再执行
             for table in meta_config.tables:
                 """把配置里的table，转成能添加到数据库中table_info里的对象
                 table -----> TableInfoMysql
                 """
+                table_info_mysql = TableInfoMySQL(
+                    id=table.name,
+                    name=table.name,
+                    role=table.role,
+                    description=tablee.description,
+                )
 
-                
+                table_infos.append(table_info_mysql)
+
+        # 保存到meta数据库。这时候需要操作它的客户端。在哪？持久层
+
         # 为字段信息构建向量索引
 
         # 为字段值信息构建全文索引
