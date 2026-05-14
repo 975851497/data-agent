@@ -9,6 +9,9 @@ from app.services.meta_knowledge_service import MetaKnowledgeService
 async def build(file_path):
     # 创建业务service对象
     meta_knowledge_service = MetaKnowledgeService()
+    # 调用业务函数
+    # 又但因为业务执行需要用到当前的配置 --> 把filepath给他。 其次 是异步，所以加await
+    await meta_knowledge_service.build(file_path)
 if __name__ == '__main__':
 
 
