@@ -59,8 +59,11 @@ class MetaKnowledgeService:
         # 保存到meta数据库。这时候需要操作它的客户端。在哪？持久层
         """
         入库，调用持久层repository 某个方法，把存的东西给它
+        
+        又因为 增删改，要改期事务，所以，加了begin事务
         """
-        await self.meta_mysql_repository.savq_table_infos(table_infos)
+        async with self.meta_mysql_repository.session.begin():
+            await self.meta_mysql_repository.savq_table_infos(table_infos)
         # 为字段信息构建向量索引
 
         # 为字段值信息构建全文索引
