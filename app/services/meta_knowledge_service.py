@@ -3,6 +3,7 @@ from pathlib import Path
 from omegaconf import OmegaConf
 
 from app.conf.meta_config import MetaConfig
+from app.core.log import logger
 
 
 # 业务中需要什么，入参传什么 ，比如操作数据库--需要把repository传进来
@@ -18,10 +19,14 @@ class MetaKnowledgeService:
         context = OmegaConf.load(file_path)
         # 创建数据封装结构
         schema = OmegaConf.structured(MetaConfig)
+        # 合并封装给对象
+        meata_config: MetaConfig = OmegaConf.to_object(OmegaConf.merge(schema, context))
+        logger.info("加载配置文件完成")
+        print(meata_config)
         # 之后呢？-->
         # 保存 表信息 到meta数据库
         # 为字段信息构建向量索引
-  
+
         # 为字段值信息构建全文索引
         # 保存 指标信息 到meta 数据库
 
