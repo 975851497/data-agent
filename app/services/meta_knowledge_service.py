@@ -1,5 +1,9 @@
 from pathlib import Path
 
+from omegaconf import OmegaConf
+
+from app.conf.meta_config import MetaConfig
+
 
 # 业务中需要什么，入参传什么 ，比如操作数据库--需要把repository传进来
 # 又因为业务需要"配置yaml"，所以要在build_meta_knowledge 中创建MetaKnowledgeService
@@ -9,8 +13,11 @@ class MetaKnowledgeService:
        pass
 
    async def build(self, file_path:Path):
-       # 要干嘛？ 第一步：加载配置文件
-
+        # 要干嘛？ 第一步：加载配置文件
+        #  加载配置文件内容
+        context = OmegaConf.load(file_path)
+        # 创建数据封装结构
+        schema = OmegaConf.structured(MetaConfig)
         # 之后呢？-->
         # 保存 表信息 到meta数据库
         # 为字段信息构建向量索引
