@@ -1,11 +1,13 @@
 from pathlib import Path
 
+from Scripts.rst2odt import description
 from omegaconf import OmegaConf
 from sqlalchemy.sql import roles
 
 from app.conf import meta_config
 from app.conf.meta_config import MetaConfig
 from app.core.log import logger
+from app.models.mysql.column_info_mysql import ColumnInfoMySQL
 from app.models.mysql.table_info_mysql import TableInfoMySQL
 from app.repositories.msyql.meta_mysql_repository import MetaMysqlRepository
 
@@ -42,6 +44,9 @@ class MetaKnowledgeService:
         if meta_config.tables:
             # 定义表信息，封装列表
             table_infos:list[TableInfoMySQL] = []
+            # 定义字段信息，封装列表
+            column_infos:list[ColumnInfoMySQL] = []
+            
             # 不为空，再执行
             for table in meta_config.tables:
                 """把配置里的table，转成能添加到数据库中table_info里的对象
@@ -56,6 +61,26 @@ class MetaKnowledgeService:
 
                 table_infos.append(table_info_mysql)
 
+                """光存了meta_config.yaml表信息还不行
+                （tables-[Table(dim_region),Table(dim_customer), Table(dim_product), Table(dim_date), Table(fact_order)），
+                每个表字段信息
+                Table 下的 columns --- for column in table.columns:
+                """
+                # 获取字段列表，封装字段数据
+                for column in table.columns:
+                    column_info = ColumnInfoMySQL(
+                        id=,
+                        name,
+                        type,
+                        role=,
+                        example=,
+                        description,
+                        alias=,
+                        table_id=,
+                    )
+                    column_infos.append(column_info)
+                    
+
         # 保存到meta数据库。这时候需要操作它的客户端。在哪？持久层
         """
         入库，调用持久层repository 某个方法，把存的东西给它
@@ -64,6 +89,7 @@ class MetaKnowledgeService:
         """
         async with self.meta_mysql_repository.session.begin():
             await self.meta_mysql_repository.save_table_infos(table_infos)
+            await self.meta_mysql_repository.save_column_infos(column_infos)
         logger.info("保存表信息到meta数据库")
 
         # 为字段信息构建向量索引

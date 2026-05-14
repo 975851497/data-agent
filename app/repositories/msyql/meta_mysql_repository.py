@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.mysql.column_info_mysql import ColumnInfoMySQL
 from app.models.mysql.table_info_mysql import TableInfoMySQL
 
 
@@ -17,3 +18,6 @@ class MetaMysqlRepository:
         """
 
         self.session.add_all(table_infos)
+
+    async def save_column_infos(self, column_infos:list[ColumnInfoMySQL]):
+        pass
