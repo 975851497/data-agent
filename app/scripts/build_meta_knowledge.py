@@ -7,7 +7,10 @@ from app.clients.mysql_client_manager import meta_mysql_client_manager
 from app.repositories.msyql.meta_mysql_repository import MetaMysqlRepository
 from app.services.meta_knowledge_service import MetaKnowledgeService
 
-
+"""
+JAVA注解 就是 我们这套流程的封装：
+数据流:  脚本中 ，调用业务 service， service 操作数据库需要 repo【传入】 ， repo 需要 session 【传入】 ， 一层层注入
+"""
 async def build(file_path):
 
     # 初始化客户端对象
