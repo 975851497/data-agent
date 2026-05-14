@@ -16,7 +16,7 @@ async def build(file_path):
     # 初始化客户端对象
     meta_mysql_client_manager.init() # 这之后，就有session factory
     # 获取session
-    async with meta_mysql_client_manager.session() as meta_session:
+    async with meta_mysql_client_manager.session_factory() as meta_session:
 
         """
         入库时，需要repository对象，所以--->先创建

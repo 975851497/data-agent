@@ -26,7 +26,7 @@ class MetaKnowledgeService:
         # 合并封装给对象
         meta_config: MetaConfig = OmegaConf.to_object(OmegaConf.merge(schema, context))
         logger.info("加载配置文件完成")
-        print(meata_config)
+        print(meta_config)
         # 之后呢？-->
         # 保存 表信息 到meta数据库
         # 我们用的什么数据库？mySQL-----> 怎么调用？ 我们用的哭护短是SQLalchemy
@@ -51,7 +51,7 @@ class MetaKnowledgeService:
                     id=table.name,
                     name=table.name,
                     role=table.role,
-                    description=tablee.description,
+                    description=table.description,
                 )
 
                 table_infos.append(table_info_mysql)
@@ -64,6 +64,8 @@ class MetaKnowledgeService:
         """
         async with self.meta_mysql_repository.session.begin():
             await self.meta_mysql_repository.save_table_infos(table_infos)
+        logger.info("保存表信息到meta数据库")
+
         # 为字段信息构建向量索引
 
         # 为字段值信息构建全文索引
