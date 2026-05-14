@@ -25,3 +25,18 @@ class DwMysqlRepository:
         # 获取结果 [ ( row(Field=order_id, Type=varchar) ) , (), () ]
         # 字典推导式 compd
         return {row.Field: row.Type for row in result}
+
+    async def get_column_values(self, table_name, column_name, limit:int = 10) -> list[str]:
+        """
+        查询字段值
+        :param table_name:
+        :param column_name:
+        :return:
+        """
+        sql = f"select distinct {column_name} from {table_name} limit {limit}"
+
+        # 执行
+        res = await self.session.execute(text(sql))
+        result = res.scalars().fetchall()
+
+        return result

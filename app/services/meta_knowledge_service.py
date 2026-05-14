@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from omegaconf import OmegaConf
+from watchfiles import awatch
 
 from app.conf.meta_config import MetaConfig
 from app.core.log import logger
@@ -72,13 +73,16 @@ class MetaKnowledgeService:
 
                 # 获取字段列表，封装字段数据
                 for column in table.columns:
+                    # 查询字段值，给examples
+                    column_values: list[str] = await self.dw_mysql_repository.get_column_values(table.name, column.name)
+
                     column_info = ColumnInfoMySQL(
                         id=f"{table.name}.{column.name}", # 没有唯一，自己构建一个唯一
                         name=column.name,
                         # type=None,# 这里没有，但是数仓里面有，这个一会去数仓里查询
                         type=column_types[column.name],
                         role=column.role,
-                        examples=[], # （值 可能是哪些，未来给大语言模型直到这个字段可能有哪些值）没有先给他空
+                        examples=column_values, # （值 可能是哪些，未来给大语言模型直到这个字段可能有哪些值）没有先给他空
                         description= column.description,
                         alias=column.alias,
                         table_id= table.name
