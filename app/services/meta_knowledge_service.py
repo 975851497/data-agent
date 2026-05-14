@@ -21,7 +21,7 @@ class MetaKnowledgeService:
         # 之后呢？-->
         # 保存 表信息 到meta数据库
         # 为字段信息构建向量索引
-
+  
         # 为字段值信息构建全文索引
         # 保存 指标信息 到meta 数据库
 
