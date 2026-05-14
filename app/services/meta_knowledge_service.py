@@ -2,6 +2,7 @@ from pathlib import Path
 
 from omegaconf import OmegaConf
 
+from app.conf import meta_config
 from app.conf.meta_config import MetaConfig
 from app.core.log import logger
 
@@ -20,11 +21,30 @@ class MetaKnowledgeService:
         # 创建数据封装结构
         schema = OmegaConf.structured(MetaConfig)
         # 合并封装给对象
-        meata_config: MetaConfig = OmegaConf.to_object(OmegaConf.merge(schema, context))
+        meta_config: MetaConfig = OmegaConf.to_object(OmegaConf.merge(schema, context))
         logger.info("加载配置文件完成")
         print(meata_config)
         # 之后呢？-->
         # 保存 表信息 到meta数据库
+        # 我们用的什么数据库？mySQL-----> 怎么调用？ 我们用的哭护短是SQLalchemy
+        # 有两种使用方法 1.原生SQl 2.ORM映射， 我们采用 ORM映射。 所以第一步，在models里，要先创建 表的类
+        # app / models / mysql / table_info_mysql.py
+
+        """
+        demo：https://docs.sqlalchemy.org/en/20/orm/quickstart.html
+        因为现在没数据，我们全量处理。如果增加完了之后，未来我又增加了一张表，一个指标。你就没必要重复添加以前那五张表了。所以代码不能写死
+        要判断。每次处理的时候判断
+        """
+        # 判断是否存在表信息的构建
+        if meta_config.tables:
+
+            # 不为空，再执行
+            for table in meta_config.tables:
+                """把配置里的table，转成能添加到数据库中table_info里的对象
+                table -----> TableInfoMysql
+                """
+
+                
         # 为字段信息构建向量索引
 
         # 为字段值信息构建全文索引
