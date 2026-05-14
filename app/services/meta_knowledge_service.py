@@ -1,5 +1,6 @@
+from dataclasses import asdict
 from pathlib import Path
-
+import uuid
 from omegaconf import OmegaConf
 from watchfiles import awatch
 
@@ -7,18 +8,24 @@ from app.conf.meta_config import MetaConfig
 from app.core.log import logger
 from app.models.mysql.column_info_mysql import ColumnInfoMySQL
 from app.models.mysql.table_info_mysql import TableInfoMySQL
+from app.models.qdrant.column_info_qdrant import ColumnInfoQdrant
 from app.repositories.msyql.dw_mysql_repository import DwMysqlRepository
 from app.repositories.msyql.meta_mysql_repository import MetaMysqlRepository
+from app.repositories.qdrant.column_qdrant_repository import ColumnQdrantRepository
 
 
 # 业务中需要什么，入参传什么 ，比如操作数据库--需要把repository传进来
 # 又因为业务需要"配置yaml"，所以要在build_meta_knowledge 中创建MetaKnowledgeService
 # 我感觉相当于 脚本调用这个service
 class MetaKnowledgeService:
-   def __init__(self,meta_mysql_repository:MetaMysqlRepository,dw_mysql_repository:DwMysqlRepository):
+   def __init__(self,meta_mysql_repository:MetaMysqlRepository,
+                dw_mysql_repository:DwMysqlRepository,
+                column_qdrant_repository:ColumnQdrantRepository
+                ):
         # 下边要入库，所以这里要传进来，meta_mysql_repository
         self.meta_mysql_repository = meta_mysql_repository
         self.dw_mysql_repository = dw_mysql_repository
+        self.column_qdrant_repository = column_qdrant_repository
 
    async def build(self, file_path:Path):
         # 要干嘛？ 第一步：加载配置文件
@@ -45,15 +52,48 @@ class MetaKnowledgeService:
         if meta_config.tables:
 
             # 抽取封装：保存表信息到meta数据库
-            await self._save_table_info_to_meta_db(meta_config)
+            column_infos:list[ColumnInfoMySQL] = await self._save_table_info_to_meta_db(meta_config)
+            logger.info("保存表信息到meta数据库")
 
 
-        logger.info("保存表信息到meta数据库")
 
         # 为字段信息构建向量索引
 
         # 1. 确保存储字段数据的向量集合存在
-        
+        await self.column_qdrant_repository.ensure_collection()
+
+        # 构建向量存储集合
+        points :list[dict] = []
+        for column_info in column_infos:
+            # name
+            points.append(
+                {
+                    "id": uuid.uuid4(),
+                    "embedding_text": column_info.name, #一会处理
+                    "payload": self._convert_column_info_from_mysql_to_qdrant(column_info),
+                }
+            )
+            # 描述description
+
+            points.append(
+                {
+                    "id": uuid.uuid4(),
+                    "embedding_text": column_info.description,  # 一会处理
+                    "payload": self._convert_column_info_from_mysql_to_qdrant(column_info),
+                }
+            )
+            # alias
+            for alia in column_info.alias:
+                points.append(
+                    {
+                        "id": uuid.uuid4(),
+                        "embedding_text": alia,  # 一会处理
+                        "payload": self._convert_column_info_from_mysql_to_qdrant(column_info),
+                    }
+                )
+            # 获取所有向量文本
+            embeddings_texts = [point["embedding_text"] for point in points]
+        # 遍历字段列表，
 
         # 为字段值信息构建全文索引
         # 保存 指标信息 到meta 数据库
@@ -121,4 +161,20 @@ class MetaKnowledgeService:
            await self.meta_mysql_repository.save_column_infos(column_infos)
 
 
+       return column_infos
 
+   def _convert_column_info_from_mysql_to_qdrant(self, column_info:ColumnInfoMySQL):
+
+       # return ColumnInfoQdrant(
+       #     **asdict(column_info)
+       # )
+       return ColumnInfoQdrant(
+           id=column_info.id,
+           name=column_info.name,
+           type=column_info.type,
+           role=column_info.role,
+           examples=column_info.examples,
+           description=column_info.description,
+           alias=column_info.alias,
+           table_id=column_info.table_id
+       )
