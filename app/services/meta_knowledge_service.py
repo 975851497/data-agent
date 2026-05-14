@@ -63,7 +63,7 @@ class MetaKnowledgeService:
         又因为 增删改，要改期事务，所以，加了begin事务
         """
         async with self.meta_mysql_repository.session.begin():
-            await self.meta_mysql_repository.savq_table_infos(table_infos)
+            await self.meta_mysql_repository.save_table_infos(table_infos)
         # 为字段信息构建向量索引
 
         # 为字段值信息构建全文索引
