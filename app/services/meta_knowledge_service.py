@@ -1,14 +1,12 @@
 from pathlib import Path
 
-from Scripts.rst2odt import description
 from omegaconf import OmegaConf
-from sqlalchemy.sql import roles
 
-from app.conf import meta_config
 from app.conf.meta_config import MetaConfig
 from app.core.log import logger
 from app.models.mysql.column_info_mysql import ColumnInfoMySQL
 from app.models.mysql.table_info_mysql import TableInfoMySQL
+from app.repositories.msyql.dw_mysql_repository import DwMysqlRepository
 from app.repositories.msyql.meta_mysql_repository import MetaMysqlRepository
 
 
@@ -16,9 +14,11 @@ from app.repositories.msyql.meta_mysql_repository import MetaMysqlRepository
 # 又因为业务需要"配置yaml"，所以要在build_meta_knowledge 中创建MetaKnowledgeService
 # 我感觉相当于 脚本调用这个service
 class MetaKnowledgeService:
-   def __init__(self,meta_mysql_repository:MetaMysqlRepository):
+   def __init__(self,meta_mysql_repository:MetaMysqlRepository,dw_mysql_repository:DwMysqlRepository):
         # 下边要入库，所以这里要传进来，meta_mysql_repository
         self.meta_mysql_repository = meta_mysql_repository
+        self.dw_mysql_repository = dw_mysql_repository
+
    async def build(self, file_path:Path):
         # 要干嘛？ 第一步：加载配置文件
         #  加载配置文件内容
@@ -61,22 +61,27 @@ class MetaKnowledgeService:
 
                 table_infos.append(table_info_mysql)
 
+                # ---------------------------------------
                 """光存了meta_config.yaml表信息还不行
                 （tables-[Table(dim_region),Table(dim_customer), Table(dim_product), Table(dim_date), Table(fact_order)），
                 每个表字段信息
                 Table 下的 columns --- for column in table.columns:
                 """
+                column_types:dict[str,str] = await self.dw_mysql_repository.get_column_types(table.name)
+                # ---------------------------------------
+
                 # 获取字段列表，封装字段数据
                 for column in table.columns:
                     column_info = ColumnInfoMySQL(
-                        id=,
-                        name,
-                        type,
-                        role=,
-                        example=,
-                        description,
-                        alias=,
-                        table_id=,
+                        id=f"{table.name}.{column.name}", # 没有唯一，自己构建一个唯一
+                        name=column.name,
+                        # type=None,# 这里没有，但是数仓里面有，这个一会去数仓里查询
+                        type=column_types[column.name],
+                        role=column.role,
+                        examples=[], # （值 可能是哪些，未来给大语言模型直到这个字段可能有哪些值）没有先给他空
+                        description= column.description,
+                        alias=column.alias,
+                        table_id= table.name
                     )
                     column_infos.append(column_info)
                     

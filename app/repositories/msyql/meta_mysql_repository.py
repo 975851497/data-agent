@@ -20,4 +20,5 @@ class MetaMysqlRepository:
         self.session.add_all(table_infos)
 
     async def save_column_infos(self, column_infos:list[ColumnInfoMySQL]):
-        pass
+        # 保存字段信息到meta 数据库
+        self.session.add_all(column_infos)
