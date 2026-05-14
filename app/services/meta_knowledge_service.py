@@ -43,62 +43,11 @@ class MetaKnowledgeService:
         """
         # 判断是否存在表信息的构建
         if meta_config.tables:
-            # 定义表信息，封装列表
-            table_infos:list[TableInfoMySQL] = []
-            # 定义字段信息，封装列表
-            column_infos:list[ColumnInfoMySQL] = []
-            
-            # 不为空，再执行
-            for table in meta_config.tables:
-                """把配置里的table，转成能添加到数据库中table_info里的对象
-                table -----> TableInfoMysql
-                """
-                table_info_mysql = TableInfoMySQL(
-                    id=table.name,
-                    name=table.name,
-                    role=table.role,
-                    description=table.description,
-                )
 
-                table_infos.append(table_info_mysql)
+            # 抽取封装：保存表信息到meta数据库
+            await self._save_table_info_to_meta_db(meta_config)
 
-                # ---------------------------------------
-                """光存了meta_config.yaml表信息还不行
-                （tables-[Table(dim_region),Table(dim_customer), Table(dim_product), Table(dim_date), Table(fact_order)），
-                每个表字段信息
-                Table 下的 columns --- for column in table.columns:
-                """
-                column_types:dict[str,str] = await self.dw_mysql_repository.get_column_types(table.name)
-                # ---------------------------------------
 
-                # 获取字段列表，封装字段数据
-                for column in table.columns:
-                    # 查询字段值，给examples
-                    column_values: list[str] = await self.dw_mysql_repository.get_column_values(table.name, column.name)
-
-                    column_info = ColumnInfoMySQL(
-                        id=f"{table.name}.{column.name}", # 没有唯一，自己构建一个唯一
-                        name=column.name,
-                        # type=None,# 这里没有，但是数仓里面有，这个一会去数仓里查询
-                        type=column_types[column.name],
-                        role=column.role,
-                        examples=column_values, # （值 可能是哪些，未来给大语言模型直到这个字段可能有哪些值）没有先给他空
-                        description= column.description,
-                        alias=column.alias,
-                        table_id= table.name
-                    )
-                    column_infos.append(column_info)
-                    
-
-        # 保存到meta数据库。这时候需要操作它的客户端。在哪？持久层
-        """
-        入库，调用持久层repository 某个方法，把存的东西给它
-        
-        又因为 增删改，要改期事务，所以，加了begin事务
-        """
-        async with self.meta_mysql_repository.session.begin():
-            await self.meta_mysql_repository.save_table_infos(table_infos)
-            await self.meta_mysql_repository.save_column_infos(column_infos)
         logger.info("保存表信息到meta数据库")
 
         # 为字段信息构建向量索引
@@ -109,6 +58,64 @@ class MetaKnowledgeService:
         # 用户问题中，可能不是我们对应的名称，比如 “提问 多少月的 销售总额 ”，销售总额就不是我数据库字段名
         # 所以，为指标信息构建 向量索引，进行相似度匹配
         pass
+
+   async def _save_table_info_to_meta_db(self, meta_config:MetaConfig):
+       # 定义表信息，封装列表
+       table_infos: list[TableInfoMySQL] = []
+       # 定义字段信息，封装列表
+       column_infos: list[ColumnInfoMySQL] = []
+
+       # 不为空，再执行
+       for table in meta_config.tables:
+           """把配置里的table，转成能添加到数据库中table_info里的对象
+           table -----> TableInfoMysql
+           """
+           table_info_mysql = TableInfoMySQL(
+               id=table.name,
+               name=table.name,
+               role=table.role,
+               description=table.description,
+           )
+
+           table_infos.append(table_info_mysql)
+
+           # ---------------------------------------
+           """光存了meta_config.yaml表信息还不行
+           （tables-[Table(dim_region),Table(dim_customer), Table(dim_product), Table(dim_date), Table(fact_order)），
+           每个表字段信息
+           Table 下的 columns --- for column in table.columns:
+           """
+           column_types: dict[str, str] = await self.dw_mysql_repository.get_column_types(table.name)
+           # ---------------------------------------
+
+           # 获取字段列表，封装字段数据
+           for column in table.columns:
+               # 查询字段值，给examples
+               column_values: list[str] = await self.dw_mysql_repository.get_column_values(table.name, column.name)
+
+               column_info = ColumnInfoMySQL(
+                   id=f"{table.name}.{column.name}",  # 没有唯一，自己构建一个唯一
+                   name=column.name,
+                   # type=None,# 这里没有，但是数仓里面有，这个一会去数仓里查询
+                   type=column_types[column.name],
+                   role=column.role,
+                   examples=column_values,  # （值 可能是哪些，未来给大语言模型直到这个字段可能有哪些值）没有先给他空
+                   description=column.description,
+                   alias=column.alias,
+                   table_id=table.name
+               )
+               column_infos.append(column_info)
+
+       # 保存到meta数据库。这时候需要操作它的客户端。在哪？持久层
+
+       """
+       入库，调用持久层repository 某个方法，把存的东西给它
+    
+       又因为 增删改，要改期事务，所以，加了begin事务
+       """
+       async with self.meta_mysql_repository.session.begin():
+           await self.meta_mysql_repository.save_table_infos(table_infos)
+           await self.meta_mysql_repository.save_column_infos(column_infos)
 
 
 
