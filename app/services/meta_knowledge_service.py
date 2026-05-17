@@ -8,9 +8,11 @@ from watchfiles import awatch
 
 from app.conf.meta_config import MetaConfig
 from app.core.log import logger
+from app.models.es.value_info_es import ValueInfoEs
 from app.models.mysql.column_info_mysql import ColumnInfoMySQL
 from app.models.mysql.table_info_mysql import TableInfoMySQL
 from app.models.qdrant.column_info_qdrant import ColumnInfoQdrant
+from app.repositories.es.value_es_repository import ValueEsRepository
 from app.repositories.msyql.dw_mysql_repository import DwMysqlRepository
 from app.repositories.msyql.meta_mysql_repository import MetaMysqlRepository
 from app.repositories.qdrant.column_qdrant_repository import ColumnQdrantRepository
@@ -23,14 +25,15 @@ class MetaKnowledgeService:
    def __init__(self,meta_mysql_repository:MetaMysqlRepository,
                 dw_mysql_repository:DwMysqlRepository,
                 column_qdrant_repository:ColumnQdrantRepository,
-                embedding_client : HuggingFaceEndpointEmbeddings
+                embedding_client : HuggingFaceEndpointEmbeddings,
+                value_es_repository:ValueEsRepository,
                 ):
         # 下边要入库，所以这里要传进来，meta_mysql_repository
         self.meta_mysql_repository = meta_mysql_repository
         self.dw_mysql_repository = dw_mysql_repository
         self.column_qdrant_repository = column_qdrant_repository
         self.embedding_client = embedding_client
-
+        self.value_es_repository = value_es_repository
 
    async def build(self, file_path:Path):
         # 要干嘛？ 第一步：加载配置文件
@@ -121,9 +124,43 @@ class MetaKnowledgeService:
             # 存储字段向量、负载到 qdrant
             await self.column_qdrant_repository.upsert_embedding(ids, embeddings, payloads)
             logger.info("为字段构建向量索引")
-        # 遍历字段列表，
+
+        # 确保存储字段值的索引存在
+        await self.value_es_repository.ensure_index()
+
+        # 获取所有字段的值是否进行全文索引标识
+        column2sync:dict[str,bool] = {}
+        for table in meta_config.tables:
+            for column in table.columns:
+                column2sync[column.name] = column.sync
+
 
         # 为字段值信息构建全文索引
+        for column_info in column_infos:
+            # 确保存储字段值的索引存在‘
+            await self.value_es_repository.ensure_index()
+            # 获取当前字段的索引标识
+            if column2sync[column_info.name]:
+                column_values:list[str] = await self.dw_mysql_repository.get_column_values(column_info.table_id, column_info.name, 1000)
+                # 收集所有字段值数据
+                value_infos:list[ValueInfoEs] = []
+                # 遍历字段列表
+                for column_value in column_values:
+                    # 创建对象
+                    value_infor_es = ValueInfoEs(
+                        id=f"{column_info.id}.{column_value}",
+                        value=column_value,
+                        type=column_info.type,
+                        column_id=column_info.id,
+                        column_name=column_info.name,
+                        table_id=column_info.table_id,
+                        table_name=column_info.table_id,
+                    )
+
+                    value_infos.append(value_infor_es)
+        # 保存到es中
+        await self.value_es_repository.save_column_values(value_infos )
+        logger.info("为字段值构建全文索引")
         # 保存 指标信息 到meta 数据库
 
         # 用户问题中，可能不是我们对应的名称，比如 “提问 多少月的 销售总额 ”，销售总额就不是我数据库字段名
