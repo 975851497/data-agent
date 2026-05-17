@@ -65,107 +65,19 @@ class MetaKnowledgeService:
 
 
 
-        # 为字段信息构建向量索引
+            # 为字段信息构建向量索引
 
-        # 1. 确保存储字段数据的向量集合存在
-        await self.column_qdrant_repository.ensure_collection()
-
-        # 构建向量存储集合
-        points :list[dict] = []
-        for column_info in column_infos:
-            # name
-            points.append(
-                {
-                    "id": uuid.uuid4(),
-                    "embedding_text": column_info.name, #一会处理
-                    "payload": self._convert_column_info_from_mysql_to_qdrant(column_info),
-                }
-            )
-            # 描述description
-
-            points.append(
-                {
-                    "id": uuid.uuid4(),
-                    "embedding_text": column_info.description,  # 一会处理
-                    "payload": self._convert_column_info_from_mysql_to_qdrant(column_info),
-                }
-            )
-            # alias
-            for alia in column_info.alias:
-                points.append(
-                    {
-                        "id": uuid.uuid4(),
-                        "embedding_text": alia,  # 一会处理
-                        "payload": self._convert_column_info_from_mysql_to_qdrant(column_info),
-                    }
-                )
-            # 获取所有向量文本
-            embeddings_texts = [point["embedding_text"] for point in points]
-            # 如果这一堆直接全发给他转向量，服务器可能承受不了，崩溃了
-            # 定义批次
-            batch_size = 10
-            # 定义向量列表
-            embeddings:list[list[float]] = []
-            # 遍历文本列表
-            for i in range(0,len(embeddings_texts),batch_size):
-                # 获取批次文本
-                batch_embedding_texts = embeddings_texts[i: i+batch_size]
-                batch_embeddings = await self.embedding_client.aembed_documents(
-                    batch_embedding_texts,
-                )
-                embeddings.extend(batch_embeddings)
-
-            # 拼装回去
-            # 获取所有id
-            ids = [point["id"] for point in points]
-            # 获取所有负载
-            payloads = [point["payload"] for point in points]
-
-            # 存储字段向量、负载到 qdrant
-            await self.column_qdrant_repository.upsert_embedding(ids, embeddings, payloads)
+            await self._save_column_info_to_qdrant(column_infos)
             logger.info("为字段构建向量索引")
 
-        # 确保存储字段值的索引存在
-        await self.value_es_repository.ensure_index()
-
-        # 获取所有字段的值是否进行全文索引标识
-        column2sync:dict[str,bool] = {}
-        for table in meta_config.tables:
-            for column in table.columns:
-                column2sync[column.name] = column.sync
+            await self.save_value_infor_to_es(column_infos,meta_config)
 
 
-        # 为字段值信息构建全文索引
-        for column_info in column_infos:
-            # 确保存储字段值的索引存在‘
-            await self.value_es_repository.ensure_index()
-            # 获取当前字段的索引标识
-            if column2sync[column_info.name]:
-                column_values:list[str] = await self.dw_mysql_repository.get_column_values(column_info.table_id, column_info.name, 1000)
-                # 收集所有字段值数据
-                value_infos:list[ValueInfoEs] = []
-                # 遍历字段列表
-                for column_value in column_values:
-                    # 创建对象
-                    value_infor_es = ValueInfoEs(
-                        id=f"{column_info.id}.{column_value}",
-                        value=column_value,
-                        type=column_info.type,
-                        column_id=column_info.id,
-                        column_name=column_info.name,
-                        table_id=column_info.table_id,
-                        table_name=column_info.table_id,
-                    )
-
-                    value_infos.append(value_infor_es)
-        # 保存到es中
-        await self.value_es_repository.save_column_values(value_infos )
-        logger.info("为字段值构建全文索引")
+            logger.info("为字段值构建全文索引")
         # 保存 指标信息 到meta 数据库
 
         # 用户问题中，可能不是我们对应的名称，比如 “提问 多少月的 销售总额 ”，销售总额就不是我数据库字段名
         # 所以，为指标信息构建 向量索引，进行相似度匹配
-        pass
 
    async def _save_table_info_to_meta_db(self, meta_config:MetaConfig):
        # 定义表信息，封装列表
@@ -243,3 +155,98 @@ class MetaKnowledgeService:
            alias=column_info.alias,
            table_id=column_info.table_id
        )
+
+   async def _save_column_info_to_qdrant(self,column_infos:list[ColumnInfoMySQL]):
+       # 1. 确保存储字段数据的向量集合存在
+       await self.column_qdrant_repository.ensure_collection()
+
+       # 构建向量存储集合
+       points: list[dict] = []
+       for column_info in column_infos:
+           # name
+           points.append(
+               {
+                   "id": uuid.uuid4(),
+                   "embedding_text": column_info.name,  # 一会处理
+                   "payload": self._convert_column_info_from_mysql_to_qdrant(column_info),
+               }
+           )
+           # 描述description
+
+           points.append(
+               {
+                   "id": uuid.uuid4(),
+                   "embedding_text": column_info.description,  # 一会处理
+                   "payload": self._convert_column_info_from_mysql_to_qdrant(column_info),
+               }
+           )
+           # alias
+           for alia in column_info.alias:
+               points.append(
+                   {
+                       "id": uuid.uuid4(),
+                       "embedding_text": alia,  # 一会处理
+                       "payload": self._convert_column_info_from_mysql_to_qdrant(column_info),
+                   }
+               )
+           # 获取所有向量文本
+           embeddings_texts = [point["embedding_text"] for point in points]
+           # 如果这一堆直接全发给他转向量，服务器可能承受不了，崩溃了
+           # 定义批次
+           batch_size = 10
+           # 定义向量列表
+           embeddings: list[list[float]] = []
+           # 遍历文本列表
+           for i in range(0, len(embeddings_texts), batch_size):
+               # 获取批次文本
+               batch_embedding_texts = embeddings_texts[i: i + batch_size]
+               batch_embeddings = await self.embedding_client.aembed_documents(
+                   batch_embedding_texts,
+               )
+               embeddings.extend(batch_embeddings)
+
+           # 拼装回去
+           # 获取所有id
+           ids = [point["id"] for point in points]
+           # 获取所有负载
+           payloads = [point["payload"] for point in points]
+
+           # 存储字段向量、负载到 qdrant
+           await self.column_qdrant_repository.upsert_embedding(ids, embeddings, payloads)
+
+   async def save_value_infor_to_es(self, column_infos:list[ColumnInfoMySQL],meta_config:MetaConfig):
+       # 确保存储字段值的索引存在
+       await self.value_es_repository.ensure_index()
+
+       # 获取所有字段的值是否进行全文索引标识
+       column2sync: dict[str, bool] = {}
+       for table in meta_config.tables:
+           for column in table.columns:
+               column2sync[column.name] = column.sync
+
+       # 为字段值信息构建全文索引
+       for column_info in column_infos:
+           # 确保存储字段值的索引存在‘
+           await self.value_es_repository.ensure_index()
+           # 获取当前字段的索引标识
+           if column2sync[column_info.name]:
+               column_values: list[str] = await self.dw_mysql_repository.get_column_values(column_info.table_id,
+                                                                                           column_info.name, 1000)
+               # 收集所有字段值数据
+               value_infos: list[ValueInfoEs] = []
+               # 遍历字段列表
+               for column_value in column_values:
+                   # 创建对象
+                   value_infor_es = ValueInfoEs(
+                       id=f"{column_info.id}.{column_value}",
+                       value=column_value,
+                       type=column_info.type,
+                       column_id=column_info.id,
+                       column_name=column_info.name,
+                       table_id=column_info.table_id,
+                       table_name=column_info.table_id,
+                   )
+
+                   value_infos.append(value_infor_es)
+       # 保存到es中
+       await self.value_es_repository.save_column_values(value_infos)
