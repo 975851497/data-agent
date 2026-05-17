@@ -1,6 +1,8 @@
 from dataclasses import asdict
 from pathlib import Path
 import uuid
+
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from omegaconf import OmegaConf
 from watchfiles import awatch
 
@@ -20,12 +22,15 @@ from app.repositories.qdrant.column_qdrant_repository import ColumnQdrantReposit
 class MetaKnowledgeService:
    def __init__(self,meta_mysql_repository:MetaMysqlRepository,
                 dw_mysql_repository:DwMysqlRepository,
-                column_qdrant_repository:ColumnQdrantRepository
+                column_qdrant_repository:ColumnQdrantRepository,
+                embedding_client : HuggingFaceEndpointEmbeddings
                 ):
         # 下边要入库，所以这里要传进来，meta_mysql_repository
         self.meta_mysql_repository = meta_mysql_repository
         self.dw_mysql_repository = dw_mysql_repository
         self.column_qdrant_repository = column_qdrant_repository
+        self.embedding_client = embedding_client
+
 
    async def build(self, file_path:Path):
         # 要干嘛？ 第一步：加载配置文件
@@ -93,6 +98,29 @@ class MetaKnowledgeService:
                 )
             # 获取所有向量文本
             embeddings_texts = [point["embedding_text"] for point in points]
+            # 如果这一堆直接全发给他转向量，服务器可能承受不了，崩溃了
+            # 定义批次
+            batch_size = 10
+            # 定义向量列表
+            embeddings:list[list[float]] = []
+            # 遍历文本列表
+            for i in range(0,len(embeddings_texts),batch_size):
+                # 获取批次文本
+                batch_embedding_texts = embeddings_texts[i: i+batch_size]
+                batch_embeddings = await self.embedding_client.aembed_documents(
+                    batch_embedding_texts,
+                )
+                embeddings.extend(batch_embeddings)
+
+            # 拼装回去
+            # 获取所有id
+            ids = [point["id"] for point in points]
+            # 获取所有负载
+            payloads = [point["payload"] for point in points]
+
+            # 存储字段向量、负载到 qdrant
+            await self.column_qdrant_repository.upsert_embedding(ids, embeddings, payloads)
+            logger.info("为字段构建向量索引")
         # 遍历字段列表，
 
         # 为字段值信息构建全文索引

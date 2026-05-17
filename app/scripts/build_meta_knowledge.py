@@ -3,6 +3,7 @@ from pathlib import Path
 
 from Lib import argparse
 
+from app.clients.embedding_client_manager import embedding_client_manager
 from app.clients.mysql_client_manager import meta_mysql_client_manager, dw_mysql_client_manager
 from app.clients.qdrant_client_manager import qdrant_client_manager
 from app.repositories.msyql.dw_mysql_repository import DwMysqlRepository
@@ -22,6 +23,7 @@ async def build(file_path):
     meta_mysql_client_manager.init() # 这之后，就有session factory
     dw_mysql_client_manager.init()
     qdrant_client_manager.init()
+    embedding_client_manager.init()
     # 获取session
     async with meta_mysql_client_manager.session_factory() as meta_session, dw_mysql_client_manager.session_factory() as dw_session:
 
@@ -38,6 +40,7 @@ async def build(file_path):
             meta_mysql_repository=meta_mysql_repository,
             dw_mysql_repository=dw_mysql_repository,
             column_qdrant_repository=column_qdrant_repository,
+            embedding_client=embedding_client_manager.client
         )
         # 调用业务函数
         # 又但因为业务执行需要用到当前的配置 --> 把filepath给他。 其次 是异步，所以加await
