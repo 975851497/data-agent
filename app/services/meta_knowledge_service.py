@@ -82,7 +82,7 @@ class MetaKnowledgeService:
             # 所以，为指标信息构建 向量索引，进行相似度匹配
 
             # 保存 指标信息 到meta 数据库
-            self._save_metric_info_to_meta_db(meta_config)
+            await self._save_metric_info_to_meta_db(meta_config)
             logger.info("保存指标信息到meta数据库")
 
 
@@ -260,7 +260,7 @@ class MetaKnowledgeService:
        # 保存到es中
        await self.value_es_repository.save_column_values(value_infos)
 
-   def _save_metric_info_to_meta_db(self, meta_config:MetaConfig):
+   async def _save_metric_info_to_meta_db(self, meta_config:MetaConfig):
 
        # 定义收集指标的列表
        metric_infos: list[MetricInfoMySQL] = []
