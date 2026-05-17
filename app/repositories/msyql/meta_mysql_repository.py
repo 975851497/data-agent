@@ -1,6 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.mysql.column_info_mysql import ColumnInfoMySQL
+from app.models.mysql.column_metric_mysql import ColumnMetricMySQL
+from app.models.mysql.metric_info_mysql import MetricInfoMySQL
 from app.models.mysql.table_info_mysql import TableInfoMySQL
 
 
@@ -22,3 +24,19 @@ class MetaMysqlRepository:
     async def save_column_infos(self, column_infos:list[ColumnInfoMySQL]):
         # 保存字段信息到meta 数据库
         self.session.add_all(column_infos)
+
+    async def save_metric_infos(self, metric_infos:list[MetricInfoMySQL]):
+        """
+        保存指标列表
+        :param metric_infos:
+        :return:
+        """
+        self.session.add_all(metric_infos)
+
+    async def save_column_metrix(self, column_metrix:list[ColumnMetricMySQL]):
+        """
+        保存 字段 - 指标 值
+        :param column_metrix:
+        :return:
+        """
+        self.session.add_all(column_metrix)

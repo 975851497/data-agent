@@ -10,6 +10,8 @@ from app.conf.meta_config import MetaConfig
 from app.core.log import logger
 from app.models.es.value_info_es import ValueInfoEs
 from app.models.mysql.column_info_mysql import ColumnInfoMySQL
+from app.models.mysql.column_metric_mysql import ColumnMetricMySQL
+from app.models.mysql.metric_info_mysql import MetricInfoMySQL
 from app.models.mysql.table_info_mysql import TableInfoMySQL
 from app.models.qdrant.column_info_qdrant import ColumnInfoQdrant
 from app.repositories.es.value_es_repository import ValueEsRepository
@@ -74,10 +76,17 @@ class MetaKnowledgeService:
 
 
             logger.info("为字段值构建全文索引")
-        # 保存 指标信息 到meta 数据库
 
-        # 用户问题中，可能不是我们对应的名称，比如 “提问 多少月的 销售总额 ”，销售总额就不是我数据库字段名
-        # 所以，为指标信息构建 向量索引，进行相似度匹配
+        if meta_config.metrics:
+            # 用户问题中，可能不是我们对应的名称，比如 “提问 多少月的 销售总额 ”，销售总额就不是我数据库字段名
+            # 所以，为指标信息构建 向量索引，进行相似度匹配
+
+            # 保存 指标信息 到meta 数据库
+            self._save_metric_info_to_meta_db(meta_config)
+            logger.info("保存指标信息到meta数据库")
+
+
+
 
    async def _save_table_info_to_meta_db(self, meta_config:MetaConfig):
        # 定义表信息，封装列表
@@ -250,3 +259,33 @@ class MetaKnowledgeService:
                    value_infos.append(value_infor_es)
        # 保存到es中
        await self.value_es_repository.save_column_values(value_infos)
+
+   def _save_metric_info_to_meta_db(self, meta_config:MetaConfig):
+
+       # 定义收集指标的列表
+       metric_infos: list[MetricInfoMySQL] = []
+       # 定义列表收集 字段 - 指标 税局
+       column_metrix: list[ColumnMetricMySQL] = []
+       for metric in meta_config.metrics:
+           logger.info(metric)
+
+           metric_info_mysql: MetricInfoMySQL = MetricInfoMySQL(
+               id=metric.name,
+               name=metric.name,
+               description=metric.description,
+               relevant_columns=metric.relevant_columns,
+               alias=metric.alias
+           )
+           metric_infos.append(metric_info_mysql)
+
+           # 构建指标关联字段
+           for relevant_column in metric.relevant_columns:
+               column_metric_mysql: ColumnMetricMySQL = ColumnMetricMySQL(
+                   column_id=relevant_column,
+                   metric_id=metric.name
+               )
+               column_metrix.append(column_metric_mysql)
+       # 保存至表信息
+       async with self.meta_mysql_repository.session.begin():
+           await self.meta_mysql_repository.save_metric_infos(metric_infos)
+           await self.meta_mysql_repository.save_column_metrix(column_metrix)
